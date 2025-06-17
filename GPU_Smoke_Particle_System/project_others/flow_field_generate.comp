@@ -1,0 +1,79 @@
+#version 430
+
+// Workgroup size: 4x4x4 = 64 threads
+layout(local_size_x = 4, local_size_y = 4, local_size_z = 4) in;
+
+// 3D texture output - stores flow field velocity data
+layout(binding = 0, rgba32f) uniform writeonly image3D flowFieldTexture;
+
+// Uniform params
+uniform vec3 u_windDirection;
+uniform float u_windStrength;
+uniform float u_time;
+uniform float u_timeScale;
+uniform float u_heightVariation;
+
+uniform vec3 u_worldMin;
+uniform vec3 u_worldMax;
+
+// Simple noise function to add variation
+float hash(float n) 
+{
+    return fract(sin(n) * 43758.5453);
+}
+
+float noise(vec3 p) 
+{
+    vec3 i = floor(p);
+    vec3 f = fract(p);
+    f = f * f * (3.0 - 2.0 * f);
+    
+    float n = i.x + i.y * 57.0 + i.z * 113.0;
+    return mix(
+        mix(mix(hash(n), hash(n + 1.0), f.x),
+            mix(hash(n + 57.0), hash(n + 58.0), f.x), f.y),
+        mix(mix(hash(n + 113.0), hash(n + 114.0), f.x),
+            mix(hash(n + 170.0), hash(n + 171.0), f.x), f.y), f.z
+    );
+}
+
+void main() {
+    ivec3 texCoord = ivec3(gl_GlobalInvocationID);
+    ivec3 texSize = imageSize(flowFieldTexture);
+    
+    // Bounds Checking
+    if (any(greaterThanEqual(texCoord, texSize))) return;
+    
+    // Texture coordinates to world coordinates (0-1 range converted to world coordinates)
+    vec3 normalizedCoord = vec3(texCoord) / vec3(texSize - 1);
+    vec3 worldPos = u_worldMin + normalizedCoord * (u_worldMax - u_worldMin);
+    
+    // Calculation basis UNIFORM_WIND
+    vec3 windVelocity = normalize(u_windDirection) * u_windStrength;
+    
+    // Adding time changes
+    float timeVariation = 1.0 + 0.15 * sin(u_time * u_timeScale);
+    windVelocity *= timeVariation;
+    
+    // Adding Height Variation
+    float heightFactor = (worldPos.y - u_worldMin.y) / (u_worldMax.y - u_worldMin.y);
+    heightFactor = clamp(heightFactor, 0.0, 1.0);
+    float heightMultiplier = 1.0 + u_heightVariation * heightFactor;
+    windVelocity *= heightMultiplier;
+    
+    // Add slight spatial noise variation
+    vec3 noisePos = worldPos * 0.02 + vec3(u_time * 0.1);
+    float noiseValue = noise(noisePos) * 2.0 - 1.0; // [-1, 1]
+    
+    // Add slight lateral disturbance
+    vec3 perpendicular1 = normalize(cross(u_windDirection, vec3(0.0, 1.0, 0.0)));
+    vec3 perpendicular2 = normalize(cross(u_windDirection, perpendicular1));
+    
+    vec3 turbulence = (perpendicular1 * noise(noisePos) + 
+                      perpendicular2 * noise(noisePos + vec3(100.0))) * 0.3;
+    
+    windVelocity += turbulence * u_windStrength * 0.2;
+    
+    // Writing to 3D Textures
+    imageStore(flowFieldTexture, texCoord, vec4(windVelocity, 0.0));
+}
