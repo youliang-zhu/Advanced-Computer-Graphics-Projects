@@ -59,15 +59,15 @@ This repository contains two computer graphics projects developed as part of the
 
 ## 🔥 Fire_Particle_System
 
-![particles.gif](Fire_Particle_System/particles.gif)
+<p align="center">   
+    <img src="Fire_Particle_System/particles.gif" alt="Demo GIF" /> 
+</p>
 
 This project creates a cool fire effect, like the exhaust from a fighter jet. It makes fire that looks real by using math to spread particles around and special ways to make them look good on screen.
 
 You can move a fighter jet around using the arrow keys and spacebar. The fire particles are spread out in a way that looks natural, like a sphere. It uses explosion textures to make the fire look even more real. The fire fades out over time, just like real flames would. Particles appear and disappear smoothly.
 
 **How it Works:** We generate a large number of particles that are distributed using a **spherical sampling formula** to create the jet exhaust. To make it more lifelike, we've added **explosion textures** and a **time-based fading shader** that makes the fire dissipate naturally.
-
-------
 
 ## 💨 GPU_Smoke_Particle_System
 
